@@ -21,7 +21,9 @@ addrlib
 bc3
 *.so
 *.c
+/linuxTools
 /macTools
+/Tools
 /pyamoto.dmgcanvas
 /Pyamoto.egg-info
 .DS_Store
