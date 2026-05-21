@@ -4874,6 +4874,13 @@ class RecentFilesMenu(QtWidgets.QMenu):
         """
 
         self.clear()  # removes any actions already in the menu
+        if len(self.FileList) < 1:
+            act = QtWidgets.QAction('(none)', self)
+            act.setEnabled(False)
+
+            self.addAction(act)
+            return
+
         ico = GetIcon('new')
 
         for i, path in enumerate(self.FileList):
@@ -4899,6 +4906,12 @@ class RecentFilesMenu(QtWidgets.QMenu):
             act.triggered.connect(lambda checked, x=i: self.HandleOpenRecentFile(x))
 
             self.addAction(act)
+        
+        ico = GetIcon('delete')
+        act = QtWidgets.QAction(ico, 'Clear Recent Files', self)
+        act.triggered.connect(self.clearRecent)
+
+        self.addAction(act)
 
     def AddToList(self, path):
         """
@@ -4926,6 +4939,14 @@ class RecentFilesMenu(QtWidgets.QMenu):
         del self.FileList[index]
         self.writeSettings()
         self.updateActionList()
+
+    def clearRecent(self):
+            """
+            Handle the Clear Recent Files button being clicked
+            """
+            ans = QtWidgets.QMessageBox.question(None, globals.trans.string('PrefsDlg', 17), globals.trans.string('PrefsDlg', 18), QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
+            if ans != QtWidgets.QMessageBox.Yes: return
+            globals.mainWindow.RecentMenu.clearAll()
 
     def clearAll(self):
         """
