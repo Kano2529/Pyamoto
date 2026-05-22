@@ -599,10 +599,7 @@ class ZonesDialog(QtWidgets.QDialog):
         bgTab.connectChanges(markDirty)
 
     def _zoneLabel(self, idx):
-        count = self.tabWidget.count()
-        if count < 5:
-            return 'Zone [num]'.replace('[num]', str(idx + 1))
-        return str(idx + 1)
+        return 'Zone [num]'.replace('[num]', str(idx + 1))
 
     def _markTabDirty(self, zoneTab):
         if zoneTab in self._dirtyTabs:
@@ -629,10 +626,7 @@ class ZonesDialog(QtWidgets.QDialog):
     def _renormalizeLabels(self):
         count = len(self.zoneTabs)
         for i in range(count):
-            if count < 6:
-                label = 'Zone [num]'.replace('[num]', str(i + 1))
-            else:
-                label = str(i + 1)
+            label = 'Zone [num]'.replace('[num]', str(i + 1))
             if self.zoneTabs[i] in self._dirtyTabs:
                 label += ' *'
             self.tabWidget.setTabText(i, label)
