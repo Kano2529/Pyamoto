@@ -63,7 +63,7 @@ class InputBox(QtWidgets.QDialog):
 
 class AboutDialog(QtWidgets.QDialog):
     """
-    The About info for Miyamoto
+    The About info for Pyamoto
     """
 
     def __init__(self):
@@ -72,47 +72,111 @@ class AboutDialog(QtWidgets.QDialog):
         """
         super().__init__()
         self.setWindowTitle('About Pyamoto')
-        self.setWindowIcon(GetIcon('help'))
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
 
-        # Open the readme file
-        f = open('readme.md', 'r')
-        readme = f.read()
-        f.close()
-        del f
+        import platform as _platform
+        icon_name = 'pyamoto1024mac.png' if _platform.system() == 'Darwin' else 'pyamoto1024.png'
+        icon_path = os.path.join(globals.miyamoto_path, 'miyamotodata', icon_name)
+        if os.path.isfile(icon_path):
+            self.setWindowIcon(QtGui.QIcon(icon_path))
+        else:
+            self.setWindowIcon(GetIcon('help'))
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(36, 28, 36, 20)
+        layout.setSpacing(0)
+
+        # Logo
+        if os.path.isfile(icon_path):
+            logo = QtWidgets.QLabel()
+            logo.setAlignment(Qt.AlignHCenter)
+            dpr = QtWidgets.QApplication.instance().devicePixelRatio()
+            physical = int(108 * dpr)
+            pix = QtGui.QPixmap(icon_path).scaled(physical, physical, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            pix.setDevicePixelRatio(dpr)
+            logo.setPixmap(pix)
+            logo.setFixedHeight(108)
+            layout.addWidget(logo)
+            layout.addSpacing(14)
+
+        # Heading
+        heading = QtWidgets.QLabel('Pyamoto Level Editor')
+        heading.setAlignment(Qt.AlignHCenter)
+        hf = heading.font()
+        hf.setPointSize(hf.pointSize() + 5)
+        hf.setBold(True)
+        heading.setFont(hf)
+        layout.addWidget(heading)
+        layout.addSpacing(4)
+
+        # Version
+        ver = QtWidgets.QLabel('v' + globals.MiyamotoVersion)
+        ver.setAlignment(Qt.AlignHCenter)
+        ver.setStyleSheet('color: palette(mid);')
+        layout.addWidget(ver)
+        layout.addSpacing(16)
 
         # Description
-        description = '<html><head><style type=\'text/CSS\'>'
-        description += 'body {font-family: Calibri}'
-        description += '.main {font-size: 12px}'
-        description += '</style></head><body>'
-        description += '<center><h1><i>Pyamoto</i> Level Editor</h1><div class=\'main\'>'
-        description += '<i>Pyamoto Level Editor</i> is an advanced fork of the original Miyamoto editor with the purpose of improving functionality and usability.<br>'
-        description += '</div></center></body></html>'
-        description += 'Need help? Check out <a href=\'https://github.com/Zenith-Team/Pyamoto\'>the Github repository</a>, and <a href=\'https://go.nsmbu.net/discord\'>our Discord server</a><br>'
+        desc = QtWidgets.QLabel(
+            'An advanced fork of the original Miyamoto editor with the purpose of '
+            'improving functionality and usability for creating New Super Mario Bros. U levels.')
+        desc.setAlignment(Qt.AlignHCenter)
+        desc.setWordWrap(True)
+        desc.setStyleSheet('color: palette(text);')
+        layout.addWidget(desc)
+        layout.addSpacing(16)
 
-        # Description label
-        descLabel = QtWidgets.QLabel()
-        descLabel.setText(description)
-        descLabel.setMinimumWidth(512)
-        descLabel.setWordWrap(True)
+        # Separator
+        sep = QtWidgets.QFrame()
+        sep.setFrameShape(QtWidgets.QFrame.HLine)
+        sep.setFrameShadow(QtWidgets.QFrame.Sunken)
+        layout.addWidget(sep)
+        layout.addSpacing(12)
 
-        # Readme.md viewer
-        readmeView = QtWidgets.QPlainTextEdit()
-        readmeView.setPlainText(readme)
-        readmeView.setReadOnly(True)
+        # Resources heading
+        res_hdr = QtWidgets.QLabel('Resources')
+        hdr_font = res_hdr.font()
+        hdr_font.setPointSize(hdr_font.pointSize() - 1)
+        hdr_font.setBold(True)
+        res_hdr.setFont(hdr_font)
+        res_hdr.setStyleSheet('color: palette(mid);')
+        res_hdr.setAlignment(Qt.AlignHCenter)
+        layout.addWidget(res_hdr)
+        layout.addSpacing(8)
 
-        # Buttonbox
-        buttonBox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok)
-        buttonBox.accepted.connect(self.accept)
+        # Links
+        links = QtWidgets.QLabel(
+            '<html><body style="text-align:center;">'
+            '&#x1F30D; <a href="https://github.com/Zenith-Team/Pyamoto">GitHub</a>'
+            ' &nbsp;&middot;&nbsp; '
+            '&#x1F4AC; <a href="https://go.nsmbu.net/discord">Discord</a>'
+            ' &nbsp;&middot;&nbsp; '
+            '&#x1F4D6; <a href="https://zenith.nsmbu.net/">Wiki</a>'
+            '</body></html>')
+        links.setTextFormat(Qt.RichText)
+        links.setOpenExternalLinks(True)
+        links.setAlignment(Qt.AlignHCenter)
+        layout.addWidget(links)
+        layout.addSpacing(16)
 
-        # Main layout
-        L = QtWidgets.QGridLayout()
-        L.addWidget(descLabel, 0, 1)
-        L.addWidget(readmeView, 1, 1)
-        L.addWidget(buttonBox, 2, 0, 1, 2)
-        L.setRowStretch(1, 1)
-        L.setColumnStretch(1, 1)
-        self.setLayout(L)
+        # Credits
+        credits = QtWidgets.QLabel(
+            '<html><body style="text-align:center;">'
+            'Maintained by <b>Zenith Team</b>.<br>'
+            '</body></html>')
+        credits.setAlignment(Qt.AlignHCenter)
+        credits.setStyleSheet('color: palette(mid); font-size: 11px;')
+        layout.addWidget(credits)
+        layout.addSpacing(20)
+
+        # OK button
+        btn = QtWidgets.QPushButton('OK')
+        btn.setFixedHeight(36)
+        btn.clicked.connect(self.accept)
+        layout.addWidget(btn)
+
+        self.adjustSize()
+        self.setFixedSize(440, self.sizeHint().height())
 
 
 class ObjectShiftDialog(QtWidgets.QDialog):
@@ -1508,6 +1572,8 @@ class PreferencesDialog(QtWidgets.QDialog):
         # Create tabs
         self.infoLabel = QtWidgets.QLabel()
         self.generalTab = self.getGeneralTab()   # merged General + Editor + Tilesets
+        self._initial_showActorNotes = self.generalTab.showActorNotes.isChecked()
+        self._initial_showInfoIcons = self.generalTab.showInfoIcons.isChecked()
         self.toolbarTab = self.getToolbarTab()
         self.themesTab = self.getThemesTab(QtWidgets.QWidget)()
         self.gameSetupTab = self.getGameSetupTab()  # merged Games + Mods
@@ -1539,7 +1605,11 @@ class PreferencesDialog(QtWidgets.QDialog):
         self.tabChanged()
 
     def needsRestart(self):
-        """Returns True only if the user changed a setting that requires a restart (theme or toolbar)."""
+        """Returns True if the user changed a setting that requires a restart (theme, toolbar, actor notes, or info icons)."""
+        if self.editorTab.showActorNotes.isChecked() != self._initial_showActorNotes:
+            return True
+        if self.editorTab.showInfoIcons.isChecked() != self._initial_showInfoIcons:
+            return True
         if self.themesTab.themeBox.currentText() != self.themesTab._initial_theme:
             return True
         if self.themesTab.NonWinStyle.currentText() != self.themesTab._initial_style:
@@ -1607,6 +1677,18 @@ class PreferencesDialog(QtWidgets.QDialog):
                 vbox.addWidget(gen_group)
 
                 # ── Editor section ───────────────────────────────────────────
+                self.showActorNotes = QtWidgets.QCheckBox('Show actor notes box')
+                self.showActorNotes.setToolTip(
+                    'When enabled, actor notes are shown in a text box within the properties panel. '
+                    'When disabled, a \"Notes\" button is shown instead which displays notes in a tooltip.')
+                self.showActorNotes.setChecked(setting('ShowActorNotes', True))
+
+                self.showInfoIcons = QtWidgets.QCheckBox('Show info icons on sprite data fields')
+                self.showInfoIcons.setToolTip(
+                    'When enabled, a small info icon is shown next to sprite data field '
+                    'labels that have a tooltip comment.')
+                self.showInfoIcons.setChecked(setting('ShowInfoIcons', True))
+
                 self.categorizedSpriteData = QtWidgets.QCheckBox('Categorized sprite data')
                 self.categorizedSpriteData.setToolTip(
                     'When enabled, actor flags in the sprite data editor are grouped into '
@@ -1614,7 +1696,7 @@ class PreferencesDialog(QtWidgets.QDialog):
                     'easier navigation.')
                 self.categorizedSpriteData.setChecked(globals.CategorizedSpriteData)
 
-                self.overwriteActors = QtWidgets.QCheckBox("Don't overwrite actors in the level archive")
+                self.overwriteActors = QtWidgets.QCheckBox("Don't overwrite actor models in the level archive")
                 self.overwriteActors.setToolTip(
                     "When enabled, actors already in the level's archive will not be replaced "
                     'by actors from the game data folder.')
@@ -1637,9 +1719,16 @@ class PreferencesDialog(QtWidgets.QDialog):
                         self.spriteListPreview.setCurrentIndex(i)
                         break
 
+                self.spriteListPreviewHighDetail = QtWidgets.QCheckBox('High Detail Mode')
+                self.spriteListPreviewHighDetail.setToolTip(
+                    'Renders preview thumbnails at the sprite\'s native resolution for '
+                    'maximum quality, then scales them down to the chosen preview size.')
+                self.spriteListPreviewHighDetail.setChecked(globals.SpriteListPreviewHighDetail)
+
                 preview_row = QtWidgets.QHBoxLayout()
                 preview_row.addWidget(QtWidgets.QLabel('Actor list preview size:'))
                 preview_row.addWidget(self.spriteListPreview)
+                preview_row.addWidget(self.spriteListPreviewHighDetail)
                 preview_row.addStretch()
 
                 ed_fps_form = QtWidgets.QFormLayout()
@@ -1647,6 +1736,8 @@ class PreferencesDialog(QtWidgets.QDialog):
 
                 ed_lay = QtWidgets.QVBoxLayout()
                 ed_lay.addLayout(ed_fps_form)
+                ed_lay.addWidget(self.showActorNotes)
+                ed_lay.addWidget(self.showInfoIcons)
                 ed_lay.addWidget(self.categorizedSpriteData)
                 ed_lay.addWidget(self.overwriteActors)
                 ed_lay.addWidget(self.placeFullSize)
@@ -2042,16 +2133,24 @@ class PreferencesDialog(QtWidgets.QDialog):
                 # ── Populate lists ────────────────────────────────────────────
                 active_set = set(current_mods)
                 for def_, folder in all_mods:
-                    if folder not in active_set:
-                        item = QtWidgets.QListWidgetItem(def_.name)
-                        item.setData(Qt.UserRole, folder)
-                        item.setData(Qt.UserRole + 1, def_.description)
+                    is_broken = bool(getattr(def_, 'error', None))
+                    if not is_broken and folder in active_set:
+                        continue
+                    item = QtWidgets.QListWidgetItem(def_.name)
+                    item.setData(Qt.UserRole, folder)
+                    item.setData(Qt.UserRole + 1, def_.description)
+                    if is_broken:
+                        item.setForeground(QtGui.QColor('#cc3333'))
+                        item.setToolTip(f'⚠ {def_.error}')
+                    else:
                         item.setToolTip(def_.description)
-                        avail_list.addItem(item)
+                    avail_list.addItem(item)
 
                 for folder in current_mods:
                     if folder in all_folders:
                         def_ = all_folders[folder]
+                        if getattr(def_, 'error', None):
+                            continue
                         item = QtWidgets.QListWidgetItem(def_.name if hasattr(def_, 'name') else folder)
                         item.setData(Qt.UserRole, folder)
                         item.setData(Qt.UserRole + 1, getattr(def_, 'description', ''))
@@ -2261,15 +2360,33 @@ class PreferencesDialog(QtWidgets.QDialog):
                     avail_list.blockSignals(True)
                     active_list.blockSignals(True)
                     avail_list.clear()
-                    active_list.clearSelection()
-                    active_list.setCurrentItem(None)
-                    for def_, folder in _gd.getAvailableMods():
-                        if folder not in current_active:
-                            item = QtWidgets.QListWidgetItem(def_.name)
+                    active_list.clear()
+                    # Rebuild active list (dropping any broken mods)
+                    all_mods = _gd.getAvailableMods()
+                    all_folders = {f: d for d, f in all_mods}
+                    for folder in current_active:
+                        if folder in all_folders:
+                            def_ = all_folders[folder]
+                            if getattr(def_, 'error', None):
+                                continue
+                            item = QtWidgets.QListWidgetItem(def_.name if hasattr(def_, 'name') else folder)
                             item.setData(Qt.UserRole, folder)
-                            item.setData(Qt.UserRole + 1, def_.description)
+                            item.setData(Qt.UserRole + 1, getattr(def_, 'description', ''))
+                            active_list.addItem(item)
+                    # Rebuild available list
+                    for def_, folder in all_mods:
+                        is_broken = bool(getattr(def_, 'error', None))
+                        if not is_broken and folder in current_active:
+                            continue
+                        item = QtWidgets.QListWidgetItem(def_.name)
+                        item.setData(Qt.UserRole, folder)
+                        item.setData(Qt.UserRole + 1, def_.description)
+                        if is_broken:
+                            item.setForeground(QtGui.QColor('#cc3333'))
+                            item.setToolTip(f'⚠ {def_.error}')
+                        else:
                             item.setToolTip(def_.description)
-                            avail_list.addItem(item)
+                        avail_list.addItem(item)
                     avail_list.blockSignals(False)
                     active_list.blockSignals(False)
                     # Reset inspector state cleanly after the rebuild.
@@ -2577,9 +2694,9 @@ class WelcomeDialog(QtWidgets.QDialog):
         # Action buttons
         _has_name_sources = hasLevelNameSources()
         for label, action in (
-            ('Open Level by File…', self.ACTION_OPEN_FILE),
-            ('Open Level by Name…', self.ACTION_OPEN_NAME),
             ('New Level',           self.ACTION_NEW_LEVEL),
+            ('Open Level by Name…', self.ACTION_OPEN_NAME),
+            ('Open Level by File…', self.ACTION_OPEN_FILE),
         ):
             btn = QtWidgets.QPushButton(label)
             btn.setFixedHeight(36)

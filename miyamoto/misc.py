@@ -121,6 +121,8 @@ class SpriteDefinition:
         self.fields = []
         self.notes = None
         self.relatedObjFiles = None
+        self.initialstate_def = None
+        self.layer_def = None
 
     class ListPropertyModel(QtCore.QAbstractListModel):
         """
@@ -158,6 +160,63 @@ class SpriteDefinition:
 
             return None
 
+    @staticmethod
+    def _nybble_spec_to_bit_range(spec):
+        """
+        Convert a nybble specification (e.g. '6', '12', '6.2', '6-8') to a
+        bit range tuple (start, end+1) in Pyamoto's 1-indexed, big-endian bit scheme.
+        Returns a single (start, end) tuple.
+        """
+        parts = spec.split('-', 1)
+        a_str = parts[0]
+        if '.' in a_str:
+            nybble, bit = map(int, a_str.split('.'))
+            start = ((nybble - 1) << 2) + bit
+        else:
+            start = ((int(a_str) - 1) << 2) + 1
+
+        if len(parts) == 2:
+            b_str = parts[1]
+            if '.' in b_str:
+                nybble, bit = map(int, b_str.split('.'))
+                end = ((nybble - 1) << 2) + bit
+            else:
+                end = (int(b_str) << 2) + 1
+        else:
+            end = start + (4 - (start - 1) % 4)  # end of the same nybble
+
+        return (start, end)
+
+    @staticmethod
+    def _parse_required(attribs):
+        """
+        Parse requirednybble/requiredval from field attributes.
+        Returns a list of (bit_range, (min, max)) tuples, or None if no requirement.
+        """
+        if 'requirednybble' not in attribs:
+            return None
+
+        raw_ranges = attribs['requirednybble'].split(',')
+        if 'requiredval' in attribs:
+            vals = attribs['requiredval'].split(',')
+            if len(raw_ranges) != len(vals):
+                raise ValueError("Required bits and vals have different lengths.")
+        else:
+            vals = [None] * len(raw_ranges)
+
+        required = []
+        for raw_range, sval in zip(raw_ranges, vals):
+            bit_range = SpriteDefinition._nybble_spec_to_bit_range(raw_range.strip())
+            if sval is None:
+                a = 1
+                b = (1 << (bit_range[1] - bit_range[0])) - 1
+            elif '-' not in sval:
+                a = b = int(sval)
+            else:
+                a, b = map(int, sval.split('-'))
+            required.append((bit_range, (a, b + 1)))
+        return required
+
     def loadFrom(self, elem):
         """
         Loads in all the field data from an XML node
@@ -166,14 +225,43 @@ class SpriteDefinition:
         fields = self.fields
 
         for field in elem:
-            if field.tag not in ['checkbox', 'list', 'value', 'bitfield']: continue
+            if field.tag in ('initialstate', 'layer'):
+                widget_type = field.attrib.get('type', 'list' if field.tag == 'layer' else 'value')
+                override_title = field.attrib.get('title', None)
+                override_comment_raw = field.attrib.get('comment', None)
+                override_comment = None
+                if override_comment_raw is not None:
+                    label = override_title or (field.tag.capitalize() if field.tag == 'layer' else 'Initial State')
+                    override_comment = '<b>[name]</b>: [note]'.replace('[name]', label).replace('[note]', override_comment_raw)
+                defn = {'comment': override_comment, 'type': widget_type}
+                if widget_type == 'dualbox':
+                    defn['title1'] = field.attrib.get('title1', '')
+                    defn['title2'] = field.attrib.get('title2', '')
+                else:
+                    defn['title'] = override_title
+                if widget_type == 'list':
+                    entries = []
+                    for e in field:
+                        if e.tag == 'entry':
+                            entries.append((int(e.attrib['value']), e.text))
+                    defn['entries'] = entries
+                if field.tag == 'initialstate':
+                    self.initialstate_def = defn
+                else:
+                    self.layer_def = defn
+                continue
+
+            if field.tag not in ['checkbox', 'list', 'value', 'bitfield', 'strybble', 'dualbox', 'multidualbox']: continue
 
             attribs = field.attrib
 
             if 'comment' in attribs:
-                comment = '<b>[name]</b>: [note]'.replace('[name]', str(attribs['title'])).replace('[note]', str(attribs['comment']))
+                name = attribs.get('title') or attribs.get('title1', '')
+                comment = '<b>[name]</b>: [note]'.replace('[name]', str(name)).replace('[note]', str(attribs['comment']))
             else:
                 comment = None
+
+            required = SpriteDefinition._parse_required(attribs)
 
             if field.tag == 'checkbox':
                 # parameters: title, bit, mask, comment, id_type, category
@@ -205,7 +293,48 @@ class SpriteDefinition:
                 else:
                     mask = 1
 
-                fields.append((0, attribs['title'], bit, mask, comment, None, attribs.get('category', None)))
+                fields.append((0, attribs['title'], bit, mask, comment, None, attribs.get('category', None), required))
+
+            elif field.tag == 'dualbox':
+                # parameters: title1, title2, bit, comment, category
+                if 'nybble' in attribs:
+                    sbit = attribs['nybble']
+                    sft = 2
+                else:
+                    sbit = attribs['bit']
+                    sft = 0
+
+                if not '-' in sbit:
+                    if not sft:
+                        bit = int(sbit)
+                    else:
+                        bit = (((int(sbit) - 1) << 2) + 1, (int(sbit) << 2) + 1)
+                else:
+                    getit = sbit.split('-')
+                    bit = (((int(getit[0]) - 1) << sft) + 1, (int(getit[1]) << sft) + 1)
+
+                fields.append((5, attribs['title1'], attribs['title2'], bit, comment, None, attribs.get('category', None), required))
+
+            elif field.tag == 'multidualbox':
+                # multibox but with dualboxes instead of checkboxes
+                # parameters: title1, title2, bit, comment, category
+                if 'nybble' in attribs:
+                    sbit = attribs['nybble']
+                    sft = 2
+                else:
+                    sbit = attribs['bit']
+                    sft = 0
+
+                if not '-' in sbit:
+                    if not sft:
+                        bit = int(sbit)
+                    else:
+                        bit = (((int(sbit) - 1) << 2) + 1, (int(sbit) << 2) + 1)
+                else:
+                    getit = sbit.split('-')
+                    bit = (((int(getit[0]) - 1) << sft) + 1, (int(getit[1]) << sft) + 1)
+
+                fields.append((7, attribs['title1'], attribs['title2'], bit, comment, None, attribs.get('category', None), required))
 
             elif field.tag == 'list':
                 # parameters: title, bit, model, comment
@@ -244,7 +373,7 @@ class SpriteDefinition:
                     existing[i] = True
 
                 fields.append(
-                    (1, attribs['title'], bit, SpriteDefinition.ListPropertyModel(entries, existing, max), comment, None, attribs.get('category', None)))
+                    (1, attribs['title'], bit, SpriteDefinition.ListPropertyModel(entries, existing, max), comment, None, attribs.get('category', None), required))
 
             elif field.tag == 'value':
                 # parameters: title, bit, max, comment
@@ -274,14 +403,34 @@ class SpriteDefinition:
                     max = 1 << (bit[1] - bit[0])
 
                 id_type = attribs.get('id_type', None)
-                fields.append((2, attribs['title'], bit, max, comment, id_type, attribs.get('category', None)))
+                fields.append((2, attribs['title'], bit, max, comment, id_type, attribs.get('category', None), required))
 
             elif field.tag == 'bitfield':
                 # parameters: title, startbit, bitnum, comment, id_type, category
                 startbit = int(attribs['startbit'])
                 bitnum = int(attribs['bitnum'])
 
-                fields.append((3, attribs['title'], startbit, bitnum, comment, None, attribs.get('category', None)))
+                fields.append((3, attribs['title'], startbit, bitnum, comment, None, attribs.get('category', None), required))
+
+            elif field.tag == 'strybble':
+                # parameters: title, bit, comment, id_type, category
+                if 'nybble' in attribs:
+                    sbit = attribs['nybble']
+                    sft = 2
+                else:
+                    sbit = attribs['bit']
+                    sft = 0
+
+                if not '-' in sbit:
+                    if not sft:
+                        bit = (int(sbit), int(sbit) + 5)
+                    else:
+                        bit = (((int(sbit) - 1) << 2) + 1, (int(sbit) << 2) + 1)
+                else:
+                    getit = sbit.split('-')
+                    bit = (((int(getit[0]) - 1) << sft) + 1, (int(getit[1]) << sft) + 1)
+
+                fields.append((4, attribs['title'], bit, comment, None, None, attribs.get('category', None), required))
 
 
 def extract_field_value(data, bit):

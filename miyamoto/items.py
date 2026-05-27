@@ -516,6 +516,7 @@ class ObjectItem(LevelEditorItem):
             x = int(newpos.x() / globals.TileWidth)
             y = int(newpos.y() / globals.TileWidth)
             if x != self.objx or y != self.objy:
+                scene.update(self.sceneBoundingRect())
                 self.LevelRect.moveTo(x, y)
 
                 oldx = self.objx
@@ -1766,10 +1767,14 @@ class SpriteItem(LevelEditorItem):
         """
         type = self.type
 
+        # Resolve name from Sprites[] (int) or CustomSpriteDefinitions (str)
         try:
             self.name = globals.Sprites[type].name
-        except:
-            self.name = 'UNKNOWN'
+        except (TypeError, IndexError):
+            try:
+                self.name = globals.CustomSpriteDefinitions[type].name
+            except (KeyError, TypeError):
+                self.name = 'UNKNOWN'
 
         self.setToolTip('<b>Actor [type]:</b><br>[name]'.replace('[type]', str(type)).replace('[name]', str(self.name)))
         self.UpdateListItem()
@@ -1789,8 +1794,9 @@ class SpriteItem(LevelEditorItem):
         self.setZValue(26000)
         self.resetTransform()
 
-        if (self.type in globals.gamedef.getImageClasses()) and (self.type not in SLib.SpriteImagesLoaded):
-            globals.gamedef.getImageClasses()[self.type].loadImages()
+        imgs = globals.gamedef.getImageClasses()
+        if (self.type in imgs) and (self.type not in SLib.SpriteImagesLoaded):
+            imgs[self.type].loadImages()
             SLib.SpriteImagesLoaded.add(self.type)
 
         self.ImageObj = obj(self) if obj else SLib.SpriteImage(self)
